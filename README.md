@@ -106,17 +106,32 @@ for index, row in df.iterrows():
     buyed = list(filter(lambda x: x[2] == row[2], buys))
     if len(buyed) > 0:
         buyedOne = buyed[0]
+        # 剩余股数
         left = buyedOne[5] + row[5]
+        # 持仓金额
+        position = buyedOne[17];
+        if row[3] == '买入':
+            position = position + row[5] * row[4]
+        else:
+            position = position - row[5] * row[4]
+        
+        if position > buyedOne[18]:
+            buyedOne[18] = position
+
 #         print(row[2], left)
         if left == 0:
-            batches.append([buyedOne[2], (parse(str(row[0])) - parse(str(buyedOne[0]))).days, buyedOne[7] + row[7], buyedOne[15] + row[15]])
+            batches.append([buyedOne[2], (parse(str(row[0])) - parse(str(buyedOne[0]))).days,
+                            buyedOne[7] + row[7], buyedOne[15] + row[15],
+                            buyedOne[16] + 1, buyedOne[18]]
+                          )
             buys = list(filter(lambda x: x[2] != row[2], buys))
         else:
             buyedOne[5] = left # 成交数量累积
             buyedOne[7] += row[7] # 发生金额累积
             buyedOne[15] += row[15] # 手续费累积
+            buyedOne[16] += 1 # 交易次数
     else:
-        buys.append(row)
+        buys.append(list(row) + ([0, row[5] * row[4], row[5] * row[4]]))
         
 #     print(buys);
 #     print(batches);
@@ -128,21 +143,23 @@ print(pdDuration)
 pdDuration.to_csv('batches.csv')
 ```
 
-             0   1        2        3
-    94    华宝油气   0   -21.74    21.74
-    0     云南铜业   1   394.77    35.23
-    114   天味食品   1   163.87    59.13
-    107   信隆健康   1  -695.59    28.59
-    106   浪潮信息   1   432.81    23.19
-    ..     ...  ..      ...      ...
-    35    盛达资源  18  3778.70   196.30
-    71   证券ETF  19  1000.75    54.65
-    95    安信信托  23 -6616.34   136.34
-    90    长安汽车  28  4022.88    74.12
-    62    天齐锂业  51  -251.05  1012.05
+             0   1        2        3   4         5
+    94    华宝油气   0   -21.74    21.74   1  108698.0
+    0     云南铜业   1   394.77    35.23   2   29960.0
+    114   天味食品   1   163.87    59.13   4   40870.0
+    107   信隆健康   1  -695.59    28.59   1   37845.0
+    106   浪潮信息   1   432.81    23.19   1   25926.0
+    ..     ...  ..      ...      ...  ..       ...
+    35    盛达资源  18  3778.70   196.30  12   75699.0
+    71   证券ETF  19  1000.75    54.65   6   84712.8
+    95    安信信托  23 -6616.34   136.34   6   64843.0
+    90    长安汽车  28  4022.88    74.12   3   58363.0
+    62    天齐锂业  51  -251.05  1012.05  47   89923.0
     
-    [178 rows x 4 columns]
+    [178 rows x 6 columns]
 
+
+### 持仓时间分布
 
 
 ```python
@@ -155,8 +172,10 @@ plt.show()
 ```
 
 
-![png](output_10_0.png)
+![png](output_11_0.png)
 
+
+### 持仓时长与收益分布
 
 
 ```python
@@ -165,10 +184,29 @@ plt.show()
 ```
 
 
-![png](output_11_0.png)
+![png](output_13_0.png)
 
+
+### 交易次数与收益分布
 
 
 ```python
-
+plt.scatter(pdDuration[4], pdDuration[2])
+plt.show()
 ```
+
+
+![png](output_15_0.png)
+
+
+### 持仓总额与收益分布
+
+
+```python
+plt.scatter(pdDuration[5], pdDuration[2])
+plt.show()
+```
+
+
+![png](output_17_0.png)
+
