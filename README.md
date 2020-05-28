@@ -92,11 +92,48 @@ print('成功率：', len(positive) / (len(dfEarn['发生金额'])))
     成功率： 0.42424242424242425
 
 
+
+```python
+### 获取历史行情
+def getHis(stockCode, date, days):
+    start = date
+    end = (parse(str(date)) + datetime.timedelta(days=days)).strftime("%Y%m%d")
+    
+    stock = str(stockCode)
+    if len(stock) == 4:
+        stock = '00' + stock
+    elif len(stock) == 3:
+        stock = '000' + stock
+    elif len(stock) == 2:
+        stock = '0000' + stock
+    elif len(stock) == 1:
+        stock = '00000' + stock
+        
+    url = 'http://q.stock.sohu.com/hisHq?\
+code=cn_%s&start=%s&end=%s&stat=1\
+&order=D&period=d&callback=historySearchHandler&rt=json'%(stock, start, end)
+    r = requests.get(url, headers={'Connection':'close'}, timeout=None)
+    
+    json = r.json();
+    rslt = None;
+    if type(json).__name__ == 'dict':
+#         print(url, json);
+        return None
+
+    stat = json[0].get('stat');
+    if stat is None:
+        return None
+    rslt = float(stat[3].replace('%', ''))
+    
+    return rslt
+```
+
 ## 持仓时长和收益的关系
 
 
 ```python
 import datetime
+import requests
 from dateutil.parser import parse
 
 buys = []
@@ -120,9 +157,20 @@ for index, row in df.iterrows():
 
 #         print(row[2], left)
         if left == 0:
+            # 清仓回测
+            clearDate = row[0];
+            # 后5天
+            later5 = getHis(row[1], row[0], 5)
+            # 后10天
+            later10 = getHis(row[1], row[0], 10)
+            # 后20天
+            later20 = getHis(row[1], row[0], 20)
+            
             batches.append([buyedOne[2], (parse(str(row[0])) - parse(str(buyedOne[0]))).days,
                             buyedOne[7] + row[7], buyedOne[15] + row[15],
-                            buyedOne[16] + 1, buyedOne[18]]
+                            buyedOne[16] + 1, buyedOne[18],
+                            later5, later10, later20
+                           ]
                           )
             buys = list(filter(lambda x: x[2] != row[2], buys))
         else:
@@ -143,20 +191,20 @@ print(pdDuration)
 pdDuration.to_csv('batches.csv')
 ```
 
-             0   1        2        3   4         5
-    94    华宝油气   0   -21.74    21.74   1  108698.0
-    0     云南铜业   1   394.77    35.23   2   29960.0
-    114   天味食品   1   163.87    59.13   4   40870.0
-    107   信隆健康   1  -695.59    28.59   1   37845.0
-    106   浪潮信息   1   432.81    23.19   1   25926.0
-    ..     ...  ..      ...      ...  ..       ...
-    35    盛达资源  18  3778.70   196.30  12   75699.0
-    71   证券ETF  19  1000.75    54.65   6   84712.8
-    95    安信信托  23 -6616.34   136.34   6   64843.0
-    90    长安汽车  28  4022.88    74.12   3   58363.0
-    62    天齐锂业  51  -251.05  1012.05  47   89923.0
+             0   1        2        3   4         5      6      7      8
+    94    华宝油气   0   -21.74    21.74   1  108698.0  -2.56  -2.56  -7.69
+    0     云南铜业   1   394.77    35.23   2   29960.0   3.83   9.87   5.84
+    114   天味食品   1   163.87    59.13   4   40870.0  -1.62  10.47   2.42
+    107   信隆健康   1  -695.59    28.59   1   37845.0   1.04   0.30  -7.91
+    106   浪潮信息   1   432.81    23.19   1   25926.0  11.48  11.46   2.45
+    ..     ...  ..      ...      ...  ..       ...    ...    ...    ...
+    35    盛达资源  18  3778.70   196.30  12   75699.0  -6.54  -5.43 -20.14
+    71   证券ETF  19  1000.75    54.65   6   84712.8   3.23   6.45   6.45
+    95    安信信托  23 -6616.34   136.34   6   64843.0  -9.58  -9.58 -25.55
+    90    长安汽车  28  4022.88    74.12   3   58363.0  -7.48 -12.02 -20.04
+    62    天齐锂业  51  -251.05  1012.05  47   89923.0  -1.74   1.96   7.31
     
-    [178 rows x 6 columns]
+    [178 rows x 9 columns]
 
 
 ### 持仓时间分布
@@ -172,7 +220,7 @@ plt.show()
 ```
 
 
-![png](output_11_0.png)
+![png](output_12_0.png)
 
 
 ### 持仓时长与收益分布
@@ -184,7 +232,7 @@ plt.show()
 ```
 
 
-![png](output_13_0.png)
+![png](output_14_0.png)
 
 
 ### 交易次数与收益分布
@@ -196,7 +244,7 @@ plt.show()
 ```
 
 
-![png](output_15_0.png)
+![png](output_16_0.png)
 
 
 ### 持仓总额与收益分布
@@ -208,5 +256,63 @@ plt.show()
 ```
 
 
-![png](output_17_0.png)
+![png](output_18_0.png)
 
+
+### 持仓时长与清仓后的走势回归
+
+
+```python
+later5 = pdDuration[lambda x: abs(x[6]) > 5]
+plt.scatter(later5[1], later5[6])
+plt.show()
+
+later10 = pdDuration[lambda x: abs(x[7]) > 5]
+plt.scatter(later10[1], later10[7])
+plt.show()
+
+later20 = pdDuration[lambda x: abs(x[8]) > 5]
+plt.scatter(later20[1], later20[8])
+plt.show()
+```
+
+
+![png](output_20_0.png)
+
+
+
+![png](output_20_1.png)
+
+
+
+![png](output_20_2.png)
+
+
+
+```python
+plt.bar(range(pdDuration.shape[0]), pdDuration[6].sort_values(0))
+plt.show()
+
+plt.bar(range(pdDuration.shape[0]), pdDuration[7].sort_values(0))
+plt.show()
+
+plt.bar(range(pdDuration.shape[0]), pdDuration[8].sort_values(0))
+plt.show()
+```
+
+
+![png](output_21_0.png)
+
+
+
+![png](output_21_1.png)
+
+
+
+![png](output_21_2.png)
+
+
+
+```python
+
+```
